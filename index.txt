@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Rendimientos de Inversión</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos personalizados para la fuente Inter */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Un color de fondo suave */
+        }
+        /* Estilos para la marca de agua */
+        .watermark {
+            position: fixed; /* Fijo al viewport */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://placehold.co/600x400/FFFFFF/000000?text=CONSUBANCO+LOGO'); /* REEMPLAZA ESTA URL con la URL real del logo de CONSUBANCO */
+            background-repeat: no-repeat;
+            background-position: center center;
+            background-size: 30%; /* Ajusta el tamaño del logo como marca de agua */
+            opacity: 0.1; /* Ajusta la opacidad para que sea una marca de agua sutil */
+            z-index: -1; /* Asegura que la marca de agua esté detrás del contenido */
+            pointer-events: none; /* Permite que los clics pasen a través de la marca de agua */
+        }
+        /* Contenedor principal para el contenido, para asegurar que esté por encima de la marca de agua */
+        .main-content-wrapper {
+            position: relative;
+            z-index: 1; /* Asegura que el contenido esté por encima de la marca de agua */
+            /* El fondo del wrapper debe ser transparente para ver la marca de agua, pero el contenedor interno del cotizador puede tener su propio color */
+        }
+        /* Color azul marino para el cotizador */
+        .cotizador-bg {
+            background-color: #000080; /* Azul marino */
+        }
+        /* Color negro para el rendimiento */
+        .rendimiento-text {
+            color: #000000; /* Negro */
+        }
+        /* Estilo para los botones */
+        .btn-primary {
+            @apply bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 ease-in-out;
+        }
+        /* Estilo para los inputs */
+        .input-field {
+            @apply p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500;
+        }
+        /* Estilo para las tablas */
+        .table-header {
+            @apply bg-gray-200 text-gray-700 uppercase text-sm leading-normal;
+        }
+        .table-row {
+            @apply border-b border-gray-200 hover:bg-gray-100;
+        }
+        .table-cell {
+            @apply py-3 px-6 text-left whitespace-nowrap;
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div class="watermark"></div> <div class="main-content-wrapper">
+        <div class="max-w-4xl mx-auto cotizador-bg p-8 rounded-xl shadow-2xl text-white">
+            <h1 class="text-3xl font-bold mb-6 text-center">Simulador de Rendimientos de Inversión</h1>
+
+            <div class="mb-6">
+                <label class="block text-lg font-semibold mb-2">Seleccione el producto:</label>
+                <div class="flex space-x-6">
+                    <label class="inline-flex items-center">
+                        <input type="radio" class="form-radio h-5 w-5 text-blue-600" name="productType" value="pagare" checked>
+                        <span class="ml-2 text-lg">Pagaré</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" class="form-radio h-5 w-5 text-blue-600" name="productType" value="cede">
+                        <span class="ml-2 text-lg">Cede</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-lg font-semibold mb-2">Tipo de Tasa:</label>
+                <div class="flex space-x-6">
+                    <label class="inline-flex items-center">
+                        <input type="radio" class="form-radio h-5 w-5 text-blue-600" name="rateType" value="fixed" checked>
+                        <span class="ml-2 text-lg">Tasa Fija</span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" class="form-radio h-5 w-5 text-blue-600" name="rateType" value="variable">
+                        <span class="ml-2 text-lg">Tasa Variable por Periodo</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div>
+                    <label for="amount" class="block text-lg font-semibold mb-2">Monto a invertir:</label>
+                    <input type="number" id="amount" class="input-field w-full text-gray-800" placeholder="Ej. 100000" min="1" value="100000">
+                </div>
+                <div>
+                    <label for="startDate" class="block text-lg font-semibold mb-2">Fecha de inicio:</label>
+                    <input type="date" id="startDate" class="input-field w-full text-gray-800">
+                </div>
+                <div id="pagareTermDiv">
+                    <label for="pagareTermDays" class="block text-lg font-semibold mb-2">Plazo (días):</label>
+                    <input type="number" id="pagareTermDays" class="input-field w-full text-gray-800" placeholder="1 a 720 días" min="1" max="720" value="360">
+                </div>
+                <div id="cedeTermDiv" class="hidden">
+                    <label for="cedeTermPeriods" class="block text-lg font-semibold mb-2">Plazo (periodos de 28 días):</label>
+                    <input type="number" id="cedeTermPeriods" class="input-field w-full text-gray-800" placeholder="3 a 24 periodos" min="3" max="24" value="3">
+                </div>
+
+                <div id="fixedRateInputs">
+                    <label for="cetesRate" class="block text-lg font-semibold mb-2">Tasa CETES anual (%):</label>
+                    <input type="number" id="cetesRate" class="input-field w-full text-gray-800" placeholder="Ej. 11.00" step="0.01" value="11.00">
+                </div>
+                <div id="fixedSobretasaInputs">
+                    <label for="sobretasa" class="block text-lg font-semibold mb-2">Sobretasa anual (puntos porcentuales):</label>
+                    <input type="number" id="sobretasa" class="input-field w-full text-gray-800" placeholder="Ej. 0.50" step="0.01" value="0.50">
+                </div>
+            </div>
+
+            <div id="variableRateInputsSection" class="hidden mb-8 p-4 border border-blue-400 rounded-lg bg-blue-900">
+                <h3 class="text-xl font-bold mb-4 text-center">Tasas por Periodo (CETES + Sobretasa)</h3>
+                <div id="periodRateInputs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    </div> </div>
+
+
+            <div class="text-center mb-8">
+                <button id="simulateBtn" class="btn-primary">Simular Rendimientos</button>
+            </div>
+
+            <div id="resultsSection" class="bg-white p-6 rounded-xl shadow-inner hidden">
+                <h2 class="text-2xl font-bold mb-4 text-gray-800 text-center">Resultados de la Simulación</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white rounded-lg">
+                        <thead>
+                            <tr class="table-header">
+                                <th class="py-3 px-6 text-left">Periodo</th>
+                                <th class="py-3 px-6 text-left">Fecha de Pago</th>
+                                <th class="py-3 px-6 text-left">Tasa Anual Aplicada (%)</th>
+                                <th class="py-3 px-6 text-left">Rendimiento Bruto</th>
+                                <th class="py-3 px-6 text-left">Retención Impuestos</th>
+                                <th class="py-3 px-6 text-left">Rendimiento Neto</th>
+                                <th class="py-3 px-6 text-left" id="capitalReturnHeader" style="display: none;">Capital</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsBody" class="text-gray-700 text-sm font-light">
+                            </tbody> <tfoot>
+                            <tr class="bg-gray-100 font-semibold text-gray-800">
+                                <td class="py-3 px-6 text-left" colspan="3">Total Rendimientos:</td>
+                                <td class="py-3 px-6 text-left" id="totalGrossReturn"></td>
+                                <td class="py-3 px-6 text-left" id="totalTaxRetention"></td>
+                                <td class="py-3 px-6 text-left" id="totalNetReturn"></td>
+                                <td class="py-3 px-6 text-left" id="totalCapitalReturn" style="display: none;"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                <p class="text-gray-700 text-sm mt-4">
+                    <strong class="font-bold">Nota sobre Días Inhábiles:</strong> Este simulador calcula los rendimientos basándose en días calendario (360 días al año). No considera los días inhábiles bancarios oficiales de México. Para cálculos que excluyan estos días, se requeriría una fuente de datos externa o un ajuste manual.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Obtener elementos del DOM
+        const productTypeRadios = document.querySelectorAll('input[name="productType"]');
+        const rateTypeRadios = document.querySelectorAll('input[name="rateType"]');
+        const pagareTermDiv = document.getElementById('pagareTermDiv');
+        const cedeTermDiv = document.getElementById('cedeTermDiv');
+        const amountInput = document.getElementById('amount');
+        const startDateInput = document.getElementById('startDate');
+        const pagareTermDaysInput = document.getElementById('pagareTermDays');
+        const cedeTermPeriodsInput = document.getElementById('cedeTermPeriods');
+        const cetesRateInput = document.getElementById('cetesRate');
+        const sobretasaInput = document.getElementById('sobretasa');
+        const simulateBtn = document.getElementById('simulateBtn');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsBody = document.getElementById('resultsBody');
+        const totalGrossReturnSpan = document.getElementById('totalGrossReturn');
+        const totalTaxRetentionSpan = document.getElementById('totalTaxRetention');
+        const totalNetReturnSpan = document.getElementById('totalNetReturn');
+        const capitalReturnHeader = document.getElementById('capitalReturnHeader');
+        const totalCapitalReturnSpan = document.getElementById('totalCapitalReturn');
+
+        const fixedRateInputsDiv = document.getElementById('fixedRateInputs');
+        const fixedSobretasaInputsDiv = document.getElementById('fixedSobretasaInputs');
+        const variableRateInputsSection = document.getElementById('variableRateInputsSection');
+        const periodRateInputsDiv = document.getElementById('periodRateInputs');
+
+        // Establecer la fecha de inicio por defecto a la fecha actual
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0'); // Meses son 0-indexados
+        const day = String(today.getDate()).padStart(2, '0');
+        startDateInput.value = `${year}-${month}-${day}`;
+
+        // Función para formatear números a moneda
+        const formatCurrency = (value) => {
+            return new Intl.NumberFormat('es-MX', {
+                style: 'currency',
+                currency: 'MXN',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(value);
+        };
+
+        // Función para generar campos de tasas variables por periodo
+        const generateVariableRateInputs = () => {
+            periodRateInputsDiv.innerHTML = ''; // Limpiar campos existentes
+            const selectedProduct = document.querySelector('input[name="productType"]:checked').value;
+            let numPeriods = 0;
+
+            if (selectedProduct === 'pagare') {
+                const termDays = parseInt(pagareTermDaysInput.value);
+                if (!isNaN(termDays) && termDays >= 1 && termDays <= 720) {
+                    numPeriods = 1; // Para Pagaré, es un solo periodo (todo el plazo)
+                }
+            } else { // Cede
+                const termPeriods = parseInt(cedeTermPeriodsInput.value);
+                if (!isNaN(termPeriods) && termPeriods >= 3 && termPeriods <= 24) {
+                    numPeriods = termPeriods;
+                }
+            }
+
+            if (numPeriods === 0) {
+                 periodRateInputsDiv.innerHTML = '<p class="text-center text-gray-200">Defina el plazo para generar las tasas por periodo.</p>';
+                 return;
+            }
+
+            for (let i = 1; i <= numPeriods; i++) {
+                const periodLabel = selectedProduct === 'pagare' ? 'Plazo Completo' : `Periodo ${i}`;
+                const div = document.createElement('div');
+                div.className = 'p-3 border border-blue-500 rounded-lg bg-blue-800 text-white';
+                div.innerHTML = `
+                    <h4 class="font-semibold mb-2">${periodLabel}:</h4>
+                    <div>
+                        <label for="cetesRate_${i}" class="block text-sm">CETES Anual (%):</label>
+                        <input type="number" id="cetesRate_${i}" class="input-field w-full text-gray-800" placeholder="Ej. 11.00" step="0.01" value="11.00">
+                    </div>
+                    <div class="mt-2">
+                        <label for="sobretasa_${i}" class="block text-sm">Sobretasa Anual (%):</label>
+                        <input type="number" id="sobretasa_${i}" class="input-field w-full text-gray-800" placeholder="Ej. 0.50" step="0.01" value="0.50">
+                    </div>
+                `;
+                periodRateInputsDiv.appendChild(div);
+            }
+        };
+
+        // Función para manejar el cambio de tipo de producto
+        const handleProductTypeChange = () => {
+            const selectedProduct = document.querySelector('input[name="productType"]:checked').value;
+            if (selectedProduct === 'pagare') {
+                pagareTermDiv.classList.remove('hidden');
+                cedeTermDiv.classList.add('hidden');
+                capitalReturnHeader.style.display = 'none';
+                totalCapitalReturnSpan.style.display = 'none';
+            } else {
+                pagareTermDiv.classList.add('hidden');
+                cedeTermDiv.classList.remove('hidden');
+                capitalReturnHeader.style.display = 'table-cell';
+                totalCapitalReturnSpan.style.display = 'table-cell';
+            }
+            resultsSection.classList.add('hidden'); // Ocultar resultados al cambiar de producto
+            handleRateTypeChange(); // Volver a generar tasas si es variable
+        };
+
+        // Función para manejar el cambio de tipo de tasa
+        const handleRateTypeChange = () => {
+            const selectedRateType = document.querySelector('input[name="rateType"]:checked').value;
+            if (selectedRateType === 'fixed') {
+                fixedRateInputsDiv.classList.remove('hidden');
+                fixedSobretasaInputsDiv.classList.remove('hidden');
+                variableRateInputsSection.classList.add('hidden');
+            } else { // variable
+                fixedRateInputsDiv.classList.add('hidden');
+                fixedSobretasaInputsDiv.classList.add('hidden');
+                variableRateInputsSection.classList.remove('hidden');
+                generateVariableRateInputs(); // Generar los campos de tasas variables
+            }
+            resultsSection.classList.add('hidden'); // Ocultar resultados al cambiar de tipo de tasa
+        };
+
+        // Añadir listeners
+        productTypeRadios.forEach(radio => {
+            radio.addEventListener('change', handleProductTypeChange);
+        });
+        rateTypeRadios.forEach(radio => {
+            radio.addEventListener('change', handleRateTypeChange);
+        });
+
+        // Event listeners para cambios en los campos de plazo (para regenerar tasas variables)
+        pagareTermDaysInput.addEventListener('input', () => {
+            if (document.querySelector('input[name="rateType"]:checked').value === 'variable') {
+                generateVariableRateInputs();
+            }
+        });
+        cedeTermPeriodsInput.addEventListener('input', () => {
+            if (document.querySelector('input[name="rateType"]:checked').value === 'variable') {
+                generateVariableRateInputs();
+            }
+        });
+
+
+        // Inicializar la vista según las selecciones por defecto
+        handleProductTypeChange(); // Esto llamará a handleRateTypeChange por defecto
+        handleRateTypeChange();
+
+
+        // Función principal de simulación
+        simulateBtn.addEventListener('click', () => {
+            // Limpiar resultados anteriores
+            resultsBody.innerHTML = '';
+            totalGrossReturnSpan.textContent = '';
+            totalTaxRetentionSpan.textContent = '';
+            totalNetReturnSpan.textContent = '';
+            totalCapitalReturnSpan.textContent = '';
+            resultsSection.classList.remove('hidden');
+
+            // Obtener valores de entrada
+            const amount = parseFloat(amountInput.value);
+            const startDate = new Date(startDateInput.value + 'T00:00:00'); // Añadir T00:00:00 para evitar problemas de zona horaria
+            const selectedProduct = document.querySelector('input[name="productType"]:checked').value;
+            const selectedRateType = document.querySelector('input[name="rateType"]:checked').value;
+
+            // Validaciones básicas
+            if (isNaN(amount) || amount <= 0) {
+                alert('Por favor, ingrese un monto válido.');
+                return;
+            }
+            if (isNaN(startDate.getTime())) {
+                alert('Por favor, ingrese una fecha de inicio válida.');
+                return;
+            }
+
+            const annualTaxRate = 0.0050; // 0.50% anual
+            const dailyTaxRate = annualTaxRate / 360;
+
+            let totalGrossReturn = 0;
+            let totalTaxRetention = 0;
+            let totalNetReturn = 0;
+
+            // Logic for Pagaré
+            if (selectedProduct === 'pagare') {
+                const termDays = parseInt(pagareTermDaysInput.value);
+                if (isNaN(termDays) || termDays < 1 || termDays > 720) {
+                    alert('Para Pagaré, el plazo debe ser entre 1 y 720 días.');
+                    return;
+                }
+
+                let annualRate = 0;
+                let rateAppliedDisplay = ''; // To display in the table
+
+                if (selectedRateType === 'fixed') {
+                    const cetesRate = parseFloat(cetesRateInput.value);
+                    const sobretasa = parseFloat(sobretasaInput.value);
+                    if (isNaN(cetesRate) || cetesRate < 0 || isNaN(sobretasa) || sobretasa < 0) {
+                        alert('Por favor, ingrese tasas CETES y Sobretasa válidas para el tipo de tasa fija.');
+                        return;
+                    }
+                    annualRate = (cetesRate + sobretasa) / 100;
+                    rateAppliedDisplay = `${(cetesRate + sobretasa).toFixed(2)}`;
+                } else { // variable
+                    const periodCetesRate = parseFloat(document.getElementById('cetesRate_1').value);
+                    const periodSobretasa = parseFloat(document.getElementById('sobretasa_1').value);
+                     if (isNaN(periodCetesRate) || periodCetesRate < 0 || isNaN(periodSobretasa) || periodSobretasa < 0) {
+                        alert('Por favor, ingrese tasas CETES y Sobretasa válidas para el periodo del Pagaré.');
+                        return;
+                    }
+                    annualRate = (periodCetesRate + periodSobretasa) / 100;
+                    rateAppliedDisplay = `${(periodCetesRate + periodSobretasa).toFixed(2)}`;
+                }
+
+                const dailyRate = annualRate / 360;
+
+                // Calcular fecha de vencimiento
+                const maturityDate = new Date(startDate);
+                maturityDate.setDate(startDate.getDate() + termDays);
+
+                // Calcular rendimientos
+                const grossReturn = amount * dailyRate * termDays;
+                const taxAmount = amount * dailyTaxRate * termDays;
+                const netReturn = grossReturn - taxAmount;
+
+                totalGrossReturn = grossReturn;
+                totalTaxRetention = taxAmount;
+                totalNetReturn = netReturn;
+
+                // Añadir fila a la tabla
+                const row = resultsBody.insertRow();
+                row.classList.add('table-row');
+                row.innerHTML = `
+                    <td class="table-cell">Único</td>
+                    <td class="table-cell">${maturityDate.toLocaleDateString('es-MX')}</td>
+                    <td class="table-cell">${rateAppliedDisplay}%</td>
+                    <td class="table-cell rendimiento-text">${formatCurrency(grossReturn)}</td>
+                    <td class="table-cell">${formatCurrency(taxAmount)}</td>
+                    <td class="table-cell rendimiento-text">${formatCurrency(netReturn)}</td>
+                    <td class="table-cell" style="display: none;"></td>
+                `;
+            } else { // Cede
+                const termPeriods = parseInt(cedeTermPeriodsInput.value);
+                if (isNaN(termPeriods) || termPeriods < 3 || termPeriods > 24) {
+                    alert('Para Cede, el plazo debe ser entre 3 y 24 periodos de 28 días.');
+                    return;
+                }
+
+                let currentPaymentDate = new Date(startDate);
+                for (let i = 1; i <= termPeriods; i++) {
+                    // Determinar la tasa anual para este periodo
+                    let annualRate = 0;
+                    let rateAppliedDisplay = '';
+
+                    if (selectedRateType === 'fixed') {
+                        const cetesRate = parseFloat(cetesRateInput.value);
+                        const sobretasa = parseFloat(sobretasaInput.value);
+                         if (isNaN(cetesRate) || cetesRate < 0 || isNaN(sobretasa) || sobretasa < 0) {
+                            alert('Por favor, ingrese tasas CETES y Sobretasa válidas para el tipo de tasa fija.');
+                            return;
+                        }
+                        annualRate = (cetesRate + sobretasa) / 100;
+                        rateAppliedDisplay = `${(cetesRate + sobretasa).toFixed(2)}`;
+                    } else { // variable
+                        const periodCetesRate = parseFloat(document.getElementById(`cetesRate_${i}`).value);
+                        const periodSobretasa = parseFloat(document.getElementById(`sobretasa_${i}`).value);
+                        if (isNaN(periodCetesRate) || periodCetesRate < 0 || isNaN(periodSobretasa) || periodSobretasa < 0) {
+                            alert(`Por favor, ingrese tasas CETES y Sobretasa válidas para el Periodo ${i}.`);
+                            return;
+                        }
+                        annualRate = (periodCetesRate + periodSobretasa) / 100;
+                        rateAppliedDisplay = `${(periodCetesRate + periodSobretasa).toFixed(2)}`;
+                    }
+
+                    const dailyRate = annualRate / 360;
+
+                    // Calcular la fecha de pago para este periodo
+                    const paymentDate = new Date(startDate); // Reset from original start date
+                    paymentDate.setDate(startDate.getDate() + (i * 28));
+
+                    // Calcular rendimientos por periodo (28 días)
+                    const periodGrossReturn = amount * dailyRate * 28;
+                    const periodTaxAmount = amount * dailyTaxRate * 28;
+                    const periodNetReturn = periodGrossReturn - periodTaxAmount;
+
+                    totalGrossReturn += periodGrossReturn;
+                    totalTaxRetention += periodTaxAmount;
+                    totalNetReturn += periodNetReturn;
+
+                    // Añadir fila a la tabla
+                    const row = resultsBody.insertRow();
+                    row.classList.add('table-row');
+                    row.innerHTML = `
+                        <td class="table-cell">${i}</td>
+                        <td class="table-cell">${paymentDate.toLocaleDateString('es-MX')}</td>
+                        <td class="table-cell">${rateAppliedDisplay}%</td>
+                        <td class="table-cell rendimiento-text">${formatCurrency(periodGrossReturn)}</td>
+                        <td class="table-cell">${formatCurrency(periodTaxAmount)}</td>
+                        <td class="table-cell rendimiento-text">${formatCurrency(periodNetReturn)}</td>
+                        <td class="table-cell"></td>
+                    `;
+                }
+
+                // Añadir la fila de capital al vencimiento
+                const maturityDate = new Date(startDate);
+                maturityDate.setDate(startDate.getDate() + (termPeriods * 28));
+                const capitalRow = resultsBody.insertRow();
+                capitalRow.classList.add('table-row', 'font-bold', 'bg-blue-50');
+                capitalRow.innerHTML = `
+                    <td class="table-cell">Vencimiento</td>
+                    <td class="table-cell">${maturityDate.toLocaleDateString('es-MX')}</td>
+                    <td class="table-cell"></td>
+                    <td class="table-cell"></td>
+                    <td class="table-cell"></td>
+                    <td class="table-cell rendimiento-text">${formatCurrency(amount)}</td>
+                `;
+                totalCapitalReturnSpan.textContent = formatCurrency(amount);
+            }
+
+            // Mostrar totales
+            totalGrossReturnSpan.textContent = formatCurrency(totalGrossReturn);
+            totalTaxRetentionSpan.textContent = formatCurrency(totalTaxRetention);
+            totalNetReturnSpan.textContent = formatCurrency(totalNetReturn);
+        });
+    </script>
+</body>
+</html>
